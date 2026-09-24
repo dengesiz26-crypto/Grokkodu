@@ -1,12 +1,18 @@
 """Goaldir / BSD Football API v2 provider.
 
-Uses the actively developed BSD Football API v2.
+Uses Goaldir only for football data:
+- fixtures
+- live events
+- results
+- lineups
+- statistics
+- incidents
+- h2h
 
 IMPORTANT:
-- Uses Authorization: Token <API_KEY>
-- Uses /api/v2/events/ endpoints
-- NEVER calls /predictions/ or /events/{id}/prediction/
-- Predictions must come from KALE's own model.
+- Goaldir odds are NO LONGER USED.
+- Market odds are supplied by The Odds API in capture.py.
+- NEVER calls /predictions/ or /events/{id}/prediction/.
 """
 
 from __future__ import annotations
@@ -81,12 +87,10 @@ class Goaldir:
         if not isinstance(body, dict):
             return []
 
-        # BSD v2 paginated responses use "results".
         results = body.get("results")
         if isinstance(results, list):
             return results
 
-        # Keep compatibility with possible provider wrappers.
         data = body.get("data")
         if isinstance(data, list):
             return data
@@ -162,32 +166,6 @@ class Goaldir:
 
         return {}
 
-    def fixture_odds(self, fixture_id: str) -> list[dict]:
-        """Return free consensus odds for one event."""
-
-        body = self._get(
-            f"events/{fixture_id}/odds/",
-            ttl=2 * 60,
-        )
-
-        if isinstance(body, list):
-            return body
-
-        if isinstance(body, dict):
-            results = body.get("results")
-            if isinstance(results, list):
-                return results
-
-            data = body.get("data")
-            if isinstance(data, list):
-                return data
-
-            items = body.get("items")
-            if isinstance(items, list):
-                return items
-
-        return []
-
     def fixture_lineups(self, fixture_id: str) -> Any:
         """Return confirmed/predicted lineup information."""
 
@@ -228,7 +206,7 @@ class Goaldir:
         """Capture today's/tomorrow's fixtures, yesterday's results,
         and one live snapshot.
 
-        No prediction endpoint is called.
+        No prediction or odds endpoint is called here.
         """
 
         today = date.today()
@@ -259,9 +237,10 @@ class Goaldir:
         fixtures: list[dict],
         now_iso_kickoff_key: str = "kickoffUtc",
     ) -> list[dict]:
-        """Enrich imminent fixtures with odds and lineups.
+        """Enrich imminent fixtures with lineups only.
 
-        This method does NOT request Goaldir predictions.
+        Odds are intentionally NOT requested from Goaldir.
+        Market odds come from The Odds API.
         """
 
         from datetime import datetime, timezone
@@ -309,12 +288,6 @@ class Goaldir:
 
             if not fixture_id:
                 continue
-
-            try:
-                if not fx.get("odds"):
-                    fx["odds"] = self.fixture_odds(fixture_id)
-            except Exception:
-                pass
 
             try:
                 if not fx.get("lineups"):
