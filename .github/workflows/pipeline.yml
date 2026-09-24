@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "capture | live | settle"
+        description: "Choose pipeline mode"
         type: choice
         options:
+          - multi
           - capture
           - live
           - settle
-        default: capture
+        default: multi
         required: true
 
   schedule:
@@ -50,22 +51,56 @@ jobs:
           restore-keys: |
             kale-hist-
 
-      - run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      # =========================
+      # ============================================================
+      # MANUAL MULTI
+      # Full pipeline:
+      # INIT -> INGEST -> TRAIN -> CAPTURE -> SETTLE -> LIVE
+      # Time is completely ignored.
+      # ============================================================
+
+      - name: Multi Init
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli init
+
+      - name: Multi Ingest
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli ingest
+
+      - name: Multi Train
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli train
+        continue-on-error: true
+
+      - name: Multi Capture
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli capture
+
+      - name: Multi Settle
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli settle
+        continue-on-error: true
+
+      - name: Multi Live
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi'
+        run: python -m src.engine.cli live
+        continue-on-error: true
+
+      # ============================================================
       # MANUAL CAPTURE
-      # Full pipeline, regardless of time
-      # =========================
+      # ============================================================
 
-      - name: Manual Init
+      - name: Manual Capture Init
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli init
 
-      - name: Manual Ingest
+      - name: Manual Capture Ingest
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli ingest
 
-      - name: Manual Train
+      - name: Manual Capture Train
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli train
         continue-on-error: true
@@ -74,36 +109,45 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli capture
 
-      - name: Manual Settle
+      - name: Manual Capture Settle
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli settle
         continue-on-error: true
 
-      # =========================
+      # ============================================================
       # MANUAL LIVE
-      # =========================
+      # ============================================================
+
+      - name: Manual Live Init
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
+        run: python -m src.engine.cli init
 
       - name: Manual Live
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
-        run: |
-          python -m src.engine.cli init
-          python -m src.engine.cli live
+        run: python -m src.engine.cli live
         continue-on-error: true
 
-      # =========================
+      # ============================================================
       # MANUAL SETTLE
-      # =========================
+      # ============================================================
+
+      - name: Manual Settle Init
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'settle'
+        run: python -m src.engine.cli init
 
       - name: Manual Settle
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'settle'
-        run: |
-          python -m src.engine.cli init
-          python -m src.engine.cli settle
+        run: python -m src.engine.cli settle
         continue-on-error: true
 
-      # =========================
-      # SCHEDULED CAPTURE
-      # =========================
+      # ============================================================
+      # SCHEDULED PIPELINE
+      #
+      # Every scheduled run:
+      # INIT -> INGEST -> [TRAIN at 06:10] -> CAPTURE -> SETTLE
+      #
+      # 15:10 and 19:40 additionally run LIVE.
+      # ============================================================
 
       - name: Scheduled Init
         if: github.event_name == 'schedule'
@@ -127,10 +171,6 @@ jobs:
         run: python -m src.engine.cli settle
         continue-on-error: true
 
-      # =========================
-      # SCHEDULED LIVE
-      # =========================
-
       - name: Scheduled Live
         if: >
           github.event_name == 'schedule' &&
@@ -141,9 +181,9 @@ jobs:
         run: python -m src.engine.cli live
         continue-on-error: true
 
-      # =========================
-      # ARTIFACT
-      # =========================
+      # ============================================================
+      # REPORTS
+      # ============================================================
 
       - uses: actions/upload-artifact@v4
         with:
