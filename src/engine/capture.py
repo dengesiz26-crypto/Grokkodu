@@ -268,18 +268,39 @@ def capture() -> dict:
         fixtures.append(n)
         seen.add(key)
 
+    # ---------------------------------------------------------
+    # MODEL PREDICTIONS
+    # ---------------------------------------------------------
+
     preds = [
         predict_match(fx, book)
         for fx in fixtures
         if fx.get("home") and fx.get("away")
     ]
 
+    # ---------------------------------------------------------
+    # PREDICTION LIST
+    #
+    # STRONG    -> value + prediction candidate
+    # CANDIDATE -> value + prediction candidate
+    # WATCH     -> prediction candidate
+    #
+    # ABSTAIN is excluded from the betting prediction list.
+    # ---------------------------------------------------------
+
     picks = [
         p
         for p in preds
-        if p.get("pick")
-        and p["pick"]["decision"] in {"STRONG", "CANDIDATE"}
+        if (
+            p.get("pick")
+            and p["pick"].get("decision")
+            in {"STRONG", "CANDIDATE", "WATCH"}
+        )
     ]
+
+    # ---------------------------------------------------------
+    # SAVE ALL MODEL PREDICTIONS
+    # ---------------------------------------------------------
 
     for p in preds:
         mk = (
@@ -305,8 +326,20 @@ def capture() -> dict:
             "payload": json.dumps(p, default=str),
         })
 
+        # -----------------------------------------------------
+        # PAPER BET
+        #
+        # Only decisions with an actual market signal are
+        # entered into paper_bets.
+        #
+        # WATCH is now included so the system can measure
+        # prediction performance instead of producing zero bets.
+        # -----------------------------------------------------
+
         if (
-            pick.get("decision") in {"STRONG", "CANDIDATE"}
+            pick.get("decision")
+            in {"STRONG", "CANDIDATE", "WATCH"}
+            and pick.get("market")
             and pick.get("market_odds")
         ):
             insert_paper({
@@ -320,10 +353,18 @@ def capture() -> dict:
                 "payload": json.dumps(p, default=str),
             })
 
+    # ---------------------------------------------------------
+    # BACKTEST
+    # ---------------------------------------------------------
+
     try:
         bt = walk_forward(hist)
     except Exception as e:
         bt = {"error": str(e)}
+
+    # ---------------------------------------------------------
+    # REPORT
+    # ---------------------------------------------------------
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -359,6 +400,7 @@ def capture() -> dict:
 
     return {
         "fixtures": len(fixtures),
+        "predictions": len(preds),
         "picks": len(picks),
         "history": int(len(hist)),
         "goaldir": bool(GOALDIR_KEY),
