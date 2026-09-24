@@ -1,68 +1,72 @@
-name: Extract uploaded ZIP
+name: Move Football Engine Contents to Main
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - "*.zip"
+workflow_dispatch:
 
 permissions:
-  contents: write
+contents: write
 
 jobs:
-  extract:
-    runs-on: ubuntu-latest
+move:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Find and extract ZIP file
-        shell: bash
-        run: |
-          set -e
+  - name: Move contents to main
+    shell: bash
+    run: |
+      set -e
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+      SOURCE="football-live-value-engine"
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "No ZIP file found."
-            exit 1
-          fi
+      if [ ! -d "$SOURCE" ]; then
+        echo "ERROR: $SOURCE directory does not exist."
+        exit 1
+      fi
 
-          echo "Extracting $ZIP_FILE"
+      echo "Moving contents of $SOURCE to repository root..."
 
-          set +e
-          unzip -o "$ZIP_FILE" -d .
-          UNZIP_STATUS=$?
-          set -e
+      # Move all files and folders, including hidden files,
+      # from football-live-value-engine into main.
+      shopt -s dotglob nullglob
 
-          if [ "$UNZIP_STATUS" -gt 1 ]; then
-            echo "ZIP extraction failed with exit code $UNZIP_STATUS."
-            exit "$UNZIP_STATUS"
-          fi
+      for item in "$SOURCE"/*; do
+        name=$(basename "$item")
 
-          if [ "$UNZIP_STATUS" -eq 1 ]; then
-            echo "ZIP extraction completed with warnings."
-          else
-            echo "ZIP extraction completed successfully."
-          fi
+        # Do not overwrite the workflow that is performing this move.
+        if [ "$name" = ".github" ]; then
+          echo "Keeping existing .github directory."
+          continue
+        fi
 
-      - name: Remove ZIP file
-        shell: bash
-        run: |
-          rm -f ./*.zip
+        rm -rf "./$name"
+        mv "$item" "./$name"
+      done
 
-      - name: Commit extracted files
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      shopt -u dotglob nullglob
 
-          git add .
+      # Delete the old football-live-value-engine directory.
+      rm -rf "$SOURCE"
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Extract uploaded project files"
-            git push
-          fi
+      echo "Final repository structure:"
+      find . -maxdepth 2 -type f | sort
+
+  - name: Commit changes
+    shell: bash
+    run: |
+      set -e
+
+      git config user.name "github-actions[bot]"
+      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      git add -A
+
+      if git diff --cached --quiet; then
+        echo "No changes detected."
+        exit 0
+      fi
+
+      git commit -m "Move football live value engine to main root"
+      git push origin main
