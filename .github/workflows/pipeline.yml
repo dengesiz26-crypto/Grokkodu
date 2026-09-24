@@ -1,32 +1,45 @@
 name: KALE capture
+
 on:
   workflow_dispatch:
     inputs:
       mode:
         description: "capture | live | settle"
+        type: choice
+        options:
+          - capture
+          - live
+          - settle
         default: capture
-        required: false
+        required: true
+
   schedule:
     - cron: "10 6 * * *"
     - cron: "10 11 * * *"
     - cron: "10 15 * * *"
     - cron: "40 19 * * *"
+
 jobs:
   pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
     permissions:
       contents: read
+
     env:
       GOALDIR_API_KEY: ${{ secrets.GOALDIR_API_KEY }}
       GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
       API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
       ODDS_API_IO_KEY: ${{ secrets.ODDS_API_IO_KEY }}
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -34,25 +47,104 @@ jobs:
             data/processed
             data/models
           key: kale-hist-${{ hashFiles('config/leagues.json') }}
-          restore-keys: kale-hist-
+          restore-keys: |
+            kale-hist-
+
       - run: pip install -r requirements.txt
-      - name: Init + ingest
-        run: |
-          python -m src.engine.cli init
-          python -m src.engine.cli ingest
-      - name: Train morning or manual
-        if: github.event.schedule == '10 6 * * *' || github.event_name == 'workflow_dispatch'
+
+      # =========================
+      # MANUAL CAPTURE
+      # Full pipeline, regardless of time
+      # =========================
+
+      - name: Manual Init
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
+        run: python -m src.engine.cli init
+
+      - name: Manual Ingest
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
+        run: python -m src.engine.cli ingest
+
+      - name: Manual Train
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli train
         continue-on-error: true
-      - name: Capture bulletin
+
+      - name: Manual Capture
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli capture
-      - name: Settle
+
+      - name: Manual Settle
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'capture'
         run: python -m src.engine.cli settle
         continue-on-error: true
-      - name: Live scan
-        if: github.event.schedule == '10 15 * * *' || github.event.schedule == '40 19 * * *' || github.event.inputs.mode == 'live'
+
+      # =========================
+      # MANUAL LIVE
+      # =========================
+
+      - name: Manual Live
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
+        run: |
+          python -m src.engine.cli init
+          python -m src.engine.cli live
+        continue-on-error: true
+
+      # =========================
+      # MANUAL SETTLE
+      # =========================
+
+      - name: Manual Settle
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'settle'
+        run: |
+          python -m src.engine.cli init
+          python -m src.engine.cli settle
+        continue-on-error: true
+
+      # =========================
+      # SCHEDULED CAPTURE
+      # =========================
+
+      - name: Scheduled Init
+        if: github.event_name == 'schedule'
+        run: python -m src.engine.cli init
+
+      - name: Scheduled Ingest
+        if: github.event_name == 'schedule'
+        run: python -m src.engine.cli ingest
+
+      - name: Scheduled Morning Train
+        if: github.event_name == 'schedule' && github.event.schedule == '10 6 * * *'
+        run: python -m src.engine.cli train
+        continue-on-error: true
+
+      - name: Scheduled Capture
+        if: github.event_name == 'schedule'
+        run: python -m src.engine.cli capture
+
+      - name: Scheduled Settle
+        if: github.event_name == 'schedule'
+        run: python -m src.engine.cli settle
+        continue-on-error: true
+
+      # =========================
+      # SCHEDULED LIVE
+      # =========================
+
+      - name: Scheduled Live
+        if: >
+          github.event_name == 'schedule' &&
+          (
+            github.event.schedule == '10 15 * * *' ||
+            github.event.schedule == '40 19 * * *'
+          )
         run: python -m src.engine.cli live
         continue-on-error: true
+
+      # =========================
+      # ARTIFACT
+      # =========================
+
       - uses: actions/upload-artifact@v4
         with:
           name: kale-reports-${{ github.run_id }}
