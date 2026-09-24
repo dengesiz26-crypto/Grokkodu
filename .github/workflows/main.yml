@@ -1,72 +1,65 @@
 name: Move Football Engine Contents to Main
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-move:
-runs-on: ubuntu-latest
+  move:
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Move contents to main
-    shell: bash
-    run: |
-      set -e
+      - name: Move contents to main
+        shell: bash
+        run: |
+          set -e
 
-      SOURCE="football-live-value-engine"
+          SOURCE="football-live-value-engine"
 
-      if [ ! -d "$SOURCE" ]; then
-        echo "ERROR: $SOURCE directory does not exist."
-        exit 1
-      fi
+          if [ ! -d "$SOURCE" ]; then
+            echo "ERROR: $SOURCE directory does not exist."
+            exit 1
+          fi
 
-      echo "Moving contents of $SOURCE to repository root..."
+          shopt -s dotglob nullglob
 
-      # Move all files and folders, including hidden files,
-      # from football-live-value-engine into main.
-      shopt -s dotglob nullglob
+          for item in "$SOURCE"/*; do
+            name=$(basename "$item")
 
-      for item in "$SOURCE"/*; do
-        name=$(basename "$item")
+            if [ "$name" = ".github" ]; then
+              echo "Keeping .github directory."
+              continue
+            fi
 
-        # Do not overwrite the workflow that is performing this move.
-        if [ "$name" = ".github" ]; then
-          echo "Keeping existing .github directory."
-          continue
-        fi
+            rm -rf "./$name"
+            mv "$item" "./$name"
+          done
 
-        rm -rf "./$name"
-        mv "$item" "./$name"
-      done
+          shopt -u dotglob nullglob
 
-      shopt -u dotglob nullglob
+          rm -rf "$SOURCE"
 
-      # Delete the old football-live-value-engine directory.
-      rm -rf "$SOURCE"
+          echo "Move completed successfully."
 
-      echo "Final repository structure:"
-      find . -maxdepth 2 -type f | sort
+      - name: Commit changes
+        shell: bash
+        run: |
+          set -e
 
-  - name: Commit changes
-    shell: bash
-    run: |
-      set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      git config user.name "github-actions[bot]"
-      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
 
-      git add -A
+          if git diff --cached --quiet; then
+            echo "No changes detected."
+            exit 0
+          fi
 
-      if git diff --cached --quiet; then
-        echo "No changes detected."
-        exit 0
-      fi
-
-      git commit -m "Move football live value engine to main root"
-      git push origin main
+          git commit -m "Move football live value engine to main root"
+          git push origin main
