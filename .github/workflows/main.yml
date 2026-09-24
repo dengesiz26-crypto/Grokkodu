@@ -1,0 +1,68 @@
+name: Extract uploaded ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Find and extract ZIP file
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No ZIP file found."
+            exit 1
+          fi
+
+          echo "Extracting $ZIP_FILE"
+
+          set +e
+          unzip -o "$ZIP_FILE" -d .
+          UNZIP_STATUS=$?
+          set -e
+
+          if [ "$UNZIP_STATUS" -gt 1 ]; then
+            echo "ZIP extraction failed with exit code $UNZIP_STATUS."
+            exit "$UNZIP_STATUS"
+          fi
+
+          if [ "$UNZIP_STATUS" -eq 1 ]; then
+            echo "ZIP extraction completed with warnings."
+          else
+            echo "ZIP extraction completed successfully."
+          fi
+
+      - name: Remove ZIP file
+        shell: bash
+        run: |
+          rm -f ./*.zip
+
+      - name: Commit extracted files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Extract uploaded project files"
+            git push
+          fi
