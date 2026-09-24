@@ -1,0 +1,19 @@
+{
+  "historical": {
+    "name": "football-data.co.uk",
+    "url": "https://www.football-data.co.uk/",
+    "why": "Free, real, multi-season results plus opening and closing bookmaker odds. Training only."
+  },
+  "bulletin_primary": {
+    "name": "Goaldir / GOAL API",
+    "base": "https://api.goal-api.com/v1",
+    "auth": "Authorization: Bearer GOALDIR_API_KEY",
+    "used_for": ["fixtures/date", "fixtures/live", "results", "odds", "lineups", "statistics", "events"],
+    "never_call": ["/predictions", "/fixtures/:id/predictions"],
+    "reason": "KALE produces its own probabilities. Goaldir is a data feed, not a tipster."
+  },
+  "bulletin_fallback": {
+    "name": "ESPN public scoreboard",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard"
+  }
+}
