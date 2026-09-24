@@ -40,6 +40,7 @@
     {"id": "facup", "name": "FA Cup", "country": "England", "espn": "eng.fa", "tier": 2},
     {"id": "copa", "name": "Copa del Rey", "country": "Spain", "espn": "esp.copa_del_rey", "tier": 3},
     {"id": "dfb", "name": "DFB-Pokal", "country": "Germany", "espn": "ger.dfb_pokal", "tier": 2},
+    {"id": "worldcup", "name": "FIFA World Cup", "country": "World", "espn": "fifa.world", "tier": 1},
     {"id": "coppa", "name": "Coppa Italia", "country": "Italy", "espn": "ita.coppa_italia", "tier": 2}
   ]
 }
