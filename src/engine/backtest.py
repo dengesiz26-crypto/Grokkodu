@@ -27,7 +27,7 @@ def walk_forward(df: pd.DataFrame, train_frac=0.82) -> dict:
         pred = 0 if ph >= pd_ and ph >= pa else 1 if pd_ >= pa else 2
         n += 1
         correct += pred == y
-        yh, yd, ya = (y == 0), y == 1, y == 2)
+        yh, yd, ya = (y == 0), (y == 1), (y == 2)
         brier += (ph - yh) ** 2 + (pd_ - yd) ** 2 + (pa - ya) ** 2
         py = [ph, pd_, pa][y]
         logloss += -math.log(max(py, 1e-6))
